@@ -1,0 +1,96 @@
+# fleet-gitops/application.yaml
+
+# 1. The Namespace for our application
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleet-dev
+---
+# 2. The Service Account the application pods will use
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fleet-app-sa
+  namespace: fleet-dev
+---
+# 3. The SecretProviderClass that defines WHAT to fetch from AWS
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: fleet-db-credentials-spc
+  namespace: fleet-dev
+spec:
+  provider: aws
+  parameters:
+    objectName: "fleet-dev-db-credentials"
+    objectType: "secretsmanager"
+  secretObjects:
+  - secretName: fleet-db-secret
+    type: Opaque
+    data:
+      - key: DB_USERNAME
+        objectName: username
+      - key: DB_PASSWORD
+        objectName: password
+      - key: DB_HOST
+        objectName: host
+      - key: DB_PORT
+        objectName: port
+      - key: DB_NAME
+        objectName: dbname
+---
+# 4. The Deployment that runs the application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-app-deployment
+  namespace: fleet-dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fleet-api
+  template:
+    metadata:
+      labels:
+        app: fleet-api
+    spec:
+      # THIS WAS A MISSING PIECE: Tell the pods to use our new Service Account
+      serviceAccountName: fleet-app-sa
+      containers:
+      - name: fleet-api-container
+        image: elvispro1993/fleet-app:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - secretRef:
+            name: fleet-db-secret # Mount the K8s secret created by the driver
+        # The volumeMounts ARE required for the driver to be triggered for this pod.
+        # This was a mistake to remove in a previous step.
+        volumeMounts:
+        - name: secrets-store-inline
+          mountPath: "/mnt/secrets-store"
+          readOnly: true
+      # The volumes section IS required.
+      volumes:
+      - name: secrets-store-inline
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: "fleet-db-credentials-spc"
+---
+# 5. The Service to expose the application inside the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-app-service
+  namespace: fleet-dev
+spec:
+  selector:
+    app: fleet-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
