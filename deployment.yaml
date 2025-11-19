@@ -19,24 +19,7 @@ spec:
         image: elvispro1993/fleet-app:latest
         ports:
         - containerPort: 8000
-        env:
-        - name: DATABASE_URL # The env var your app needs
-          # This special syntax builds the connection string
-          # using the keys from the AWS secret.
-          value: "postgresql://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
-        # This section pulls the individual secret values into env vars
+        # This is the correct, simple way to mount the entire secret as env vars
         envFrom:
         - secretRef:
-            name: fleet-db-secret # This is a new K8s secret the driver will create
-      # This section mounts the secret into the pod
-      volumeMounts:
-      - name: secrets-store-inline
-        mountPath: "/mnt/secrets-store"
-        readOnly: true
-    volumes:
-    - name: secrets-store-inline
-      csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: "fleet-db-credentials-spc"
+            name: fleet-db-secret # Mount the K8s secret created by the CSI driver
