@@ -13,13 +13,15 @@ spec:
     metadata:
       labels:
         app: fleet-api
+        # --- ADD THIS REQUIRED LABEL ---
+        secrets-store.csi.k8s.io/used: "true"
     spec:
+      # The rest of the file remains the same
       containers:
       - name: fleet-api-container
         image: elvispro1993/fleet-app:latest
         ports:
         - containerPort: 8000
-        # This is the correct, simple way to mount the entire secret as env vars
         envFrom:
         - secretRef:
-            name: fleet-db-secret # Mount the K8s secret created by the CSI driver
+            name: fleet-db-secret
