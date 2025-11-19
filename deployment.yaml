@@ -1,10 +1,11 @@
+# fleet-gitops/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: fleet-app-deployment
-  namespace: fleet-dev # Deploy into our new namespace
+  namespace: fleet-dev
 spec:
-  replicas: 2 # Run two instances of our application for availability
+  replicas: 2
   selector:
     matchLabels:
       app: fleet-api
@@ -15,7 +16,27 @@ spec:
     spec:
       containers:
       - name: fleet-api-container
-        # This is the image that Pipeline 1 built and pushed to Docker Hub
         image: elvispro1993/fleet-app:latest
         ports:
-        - containerPort: 8000 # The port your FastAPI app listens on
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL # The env var your app needs
+          # This special syntax builds the connection string
+          # using the keys from the AWS secret.
+          value: "postgresql://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+        # This section pulls the individual secret values into env vars
+        envFrom:
+        - secretRef:
+            name: fleet-db-secret # This is a new K8s secret the driver will create
+      # This section mounts the secret into the pod
+      volumeMounts:
+      - name: secrets-store-inline
+        mountPath: "/mnt/secrets-store"
+        readOnly: true
+    volumes:
+    - name: secrets-store-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "fleet-db-credentials-spc"
