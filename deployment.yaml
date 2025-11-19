@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-app-deployment
+  namespace: fleet-dev # Deploy into our new namespace
+spec:
+  replicas: 2 # Run two instances of our application for availability
+  selector:
+    matchLabels:
+      app: fleet-api
+  template:
+    metadata:
+      labels:
+        app: fleet-api
+    spec:
+      containers:
+      - name: fleet-api-container
+        # This is the image that Pipeline 1 built and pushed to Docker Hub
+        image: elvispro1993/fleet-app:latest
+        ports:
+        - containerPort: 8000 # The port your FastAPI app listens on
